@@ -27,3 +27,42 @@ be replaced.
 * Enough storage for your firmware image twice, uboot and any other bits you need.
 * Enough RAM to hold the two images during boot up.
 * A GPIO to trigger booting the previous firmware in recovery situations.
+
+## Firmware repo
+
+### Layout
+```
+manifest.json
+sig.json
+myimage_0.fit
+myimage_1.fit
+...
+```
+
+### Manifest format
+
+```json
+{
+	"serial": 0,
+	"images": [
+		{
+			"name": "image.fit"
+			"version": 0
+			"signatures": [
+				{
+					"type": "rsa-sha256",
+					"data": "xxx"
+				}
+			]
+		}
+	]
+}
+```
+
+```json
+[
+	{
+		"type": "rsa-sha256",
+		"data": "xxx"
+	}
+]

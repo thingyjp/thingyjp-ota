@@ -1,0 +1,3 @@
+[submodule "json-glib-macros"]
+	path = json-glib-macros
+	url = https://github.com/fifteenhex/json-glib-macros
