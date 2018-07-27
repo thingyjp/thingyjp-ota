@@ -46,8 +46,12 @@ myimage_1.fit
 	"serial": 0,
 	"images": [
 		{
-			"name": "image.fit"
-			"version": 0
+			"uuid": "8ec32fe0-9bff-44bd-9f84-0b63088b1f13",
+			"version": 0,
+			"size": 0,
+			"enabled": true,
+			"tags": [
+			],
 			"signatures": [
 				{
 					"type": "rsa-sha256",

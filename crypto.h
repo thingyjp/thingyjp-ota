@@ -21,3 +21,4 @@ void crypto_writekeys(struct crypto_keys* keys, const gchar* rsapubkeypath,
 		const gchar* rsaprivkeypath);
 struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 		const gchar* rsaprivkeypath);
+void crypto_keys_free(struct crypto_keys* keys);

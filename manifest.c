@@ -16,15 +16,16 @@ static void manifest_signature_free_gdestroynotify(gpointer data) {
 }
 
 struct manifest_image* manifest_image_new() {
-	struct manifest_image* manifest_image = g_malloc0(sizeof(*manifest_image));
-	manifest_image->signatures = g_ptr_array_new_with_free_func(
+	struct manifest_image* image = g_malloc0(sizeof(*image));
+	image->tags = g_ptr_array_new();
+	image->signatures = g_ptr_array_new_with_free_func(
 			manifest_signature_free_gdestroynotify);
-	return manifest_image;
+	return image;
 }
 
 static void manifest_image_free(struct manifest_image* manifest_image) {
-	if (manifest_image->name != NULL)
-		g_free(manifest_image->name);
+	if (manifest_image->uuid != NULL)
+		g_free(manifest_image->uuid);
 	g_ptr_array_free(manifest_image->signatures, TRUE);
 	g_free(manifest_image);
 }
@@ -42,9 +43,9 @@ static void manifest_signature_deserialise(JsonArray *array, guint index,
 		return;
 
 	const gchar* type = JSON_OBJECT_GET_MEMBER_STRING(rootobj,
-			OTA_JSONFIELD_SIGNATURE_TYPE);
+			MANIFEST_JSONFIELD_SIGNATURE_TYPE);
 	const gchar* data = JSON_OBJECT_GET_MEMBER_STRING(rootobj,
-			OTA_JSONFIELD_SIGNATURE_DATA);
+			MANIFEST_JSONFIELD_SIGNATURE_DATA);
 
 	if (type == NULL || data == NULL) {
 		g_message("incomplete or invalid signature");
@@ -67,15 +68,16 @@ static void manifest_signature_deserialise(JsonArray *array, guint index,
 
 	struct manifest_signature* signature = manifest_signature_new();
 	signature->type = sigtype;
+	signature->data = g_strdup(data);
 	g_ptr_array_add(signatures, signature);
 }
 
 void manifest_signature_serialise(JsonBuilder* builder,
 		struct manifest_signature* signature) {
 	json_builder_begin_object(builder);
-	JSONBUILDER_ADD_STRING(builder, OTA_JSONFIELD_SIGNATURE_TYPE,
+	JSONBUILDER_ADD_STRING(builder, MANIFEST_JSONFIELD_SIGNATURE_TYPE,
 			manifest_signaturetypestrings[signature->type]);
-	JSONBUILDER_ADD_STRING(builder, OTA_JSONFIELD_SIGNATURE_DATA,
+	JSONBUILDER_ADD_STRING(builder, MANIFEST_JSONFIELD_SIGNATURE_DATA,
 			signature->data);
 	json_builder_end_object(builder);
 }
@@ -91,9 +93,17 @@ static void manifest_image_serialise(gpointer data, gpointer user_data) {
 	JsonBuilder* builder = user_data;
 
 	json_builder_begin_object(builder);
-	JSONBUILDER_ADD_STRING(builder, OTA_JSONFIELD_IMAGE_NAME, "xx");
-	JSONBUILDER_ADD_INT(builder, OTA_JSONFIELD_IMAGE_VERSION, image->version);
-	JSONBUILDER_START_ARRAY(builder, OTA_JSONFIELD_SIGNATURES);
+	JSONBUILDER_ADD_STRING(builder, MANIFEST_JSONFIELD_IMAGE_UUID, image->uuid);
+	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_IMAGE_VERSION,
+			image->version);
+	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_IMAGE_SIZE, image->size);
+	JSONBUILDER_ADD_BOOL(builder, MANIFEST_JSONFIELD_IMAGE_ENABLED,
+			image->enabled);
+	if (image->tags->len > 0) {
+		JSONBUILDER_START_ARRAY(builder, MANIFEST_JSONFIELD_IMAGE_TAGS);
+		json_builder_end_array(builder);
+	}
+	JSONBUILDER_START_ARRAY(builder, MANIFEST_JSONFIELD_SIGNATURES);
 	g_ptr_array_foreach(image->signatures, manifest_signature_serialise_gfunc,
 			builder);
 	json_builder_end_array(builder);
@@ -106,14 +116,20 @@ static void manifest_image_deserialise(JsonArray *array, guint index,
 	GPtrArray* manifest_images = user_data;
 	struct manifest_image* manifest_image = manifest_image_new();
 
-	gchar* name;
+	gchar* uuid;
+	int version;
+	gssize size;
 	JsonObject* imageobj = JSON_NODE_GET_OBJECT(element_node);
 	if (imageobj != NULL) {
-		name = JSON_OBJECT_GET_MEMBER_STRING(imageobj,
-				OTA_JSONFIELD_IMAGE_NAME);
+		uuid = JSON_OBJECT_GET_MEMBER_STRING(imageobj,
+				MANIFEST_JSONFIELD_IMAGE_UUID);
 		JsonArray* signatures = JSON_OBJECT_GET_MEMBER_ARRAY(imageobj,
-				OTA_JSONFIELD_SIGNATURES);
-		if (name == NULL || signatures == NULL) {
+				MANIFEST_JSONFIELD_SIGNATURES);
+		version = JSON_OBJECT_GET_MEMBER_INT(imageobj,
+				MANIFEST_JSONFIELD_IMAGE_VERSION);
+		size = JSON_OBJECT_GET_MEMBER_INT(imageobj,
+				MANIFEST_JSONFIELD_IMAGE_SIZE);
+		if (uuid == NULL || signatures == NULL || version == -1 || size <= 0) {
 			g_message("incomplete or invalid image");
 			goto err_parse;
 		}
@@ -129,7 +145,9 @@ static void manifest_image_deserialise(JsonArray *array, guint index,
 		goto err_parse;
 	}
 
-	manifest_image->name = g_strdup(name);
+	manifest_image->uuid = g_strdup(uuid);
+	manifest_image->version = version;
+	manifest_image->size = size;
 
 	g_ptr_array_add(manifest_images, manifest_image);
 	return;
@@ -144,12 +162,20 @@ gboolean manifest_deserialise_into(struct manifest_manifest* manifest,
 	gboolean ret = FALSE;
 	JsonParser* parser = json_parser_new();
 
+	int serial;
 	if (json_parser_load_from_data(parser, data, len, NULL)) {
 		JsonNode* root = json_parser_get_root(parser);
 		JsonObject* rootobj = JSON_NODE_GET_OBJECT(root);
 		if (rootobj != NULL) {
+			serial = JSON_OBJECT_GET_MEMBER_INT(rootobj,
+					MANIFEST_JSONFIELD_SERIAL);
+			if (serial <= 0) {
+				g_message("bad serial");
+				goto err_parse;
+			}
+
 			JsonArray* images = JSON_OBJECT_GET_MEMBER_ARRAY(rootobj,
-					OTA_JSONFIELD_IMAGES);
+					MANIFEST_JSONFIELD_IMAGES);
 			if (images != NULL) {
 				json_array_foreach_element(images, manifest_image_deserialise,
 						manifest->images);
@@ -161,8 +187,12 @@ gboolean manifest_deserialise_into(struct manifest_manifest* manifest,
 			g_message("root node should be an object");
 			goto err_parse;
 		}
-	} else
+	} else {
 		g_message("failed to parse manifest");
+		goto err_parse;
+	}
+
+	manifest->serial = serial;
 
 	ret = TRUE;
 
@@ -175,9 +205,10 @@ JsonBuilder* manifest_serialise(struct manifest_manifest* manifest) {
 	JsonBuilder* builder = json_builder_new();
 	json_builder_begin_object(builder);
 
-	JSONBUILDER_ADD_INT(builder, OTA_JSONFIELD_SERIAL, manifest->serial);
-	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_TIMESTAMP, 0);
-	JSONBUILDER_START_ARRAY(builder, OTA_JSONFIELD_IMAGES);
+	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_SERIAL, manifest->serial);
+	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_TIMESTAMP,
+			manifest->timestamp);
+	JSONBUILDER_START_ARRAY(builder, MANIFEST_JSONFIELD_IMAGES);
 	g_ptr_array_foreach(manifest->images, manifest_image_serialise, builder);
 	json_builder_end_array(builder);
 
@@ -205,4 +236,31 @@ struct manifest_manifest* manifest_new() {
 void manifest_free(struct manifest_manifest* manifest) {
 	g_ptr_array_free(manifest->images, TRUE);
 	g_free(manifest);
+}
+
+GPtrArray* manifest_signatures_deserialise(const gchar* data, gsize len) {
+	GPtrArray* sigs = NULL;
+	JsonParser* jsonparser = json_parser_new();
+	if (!json_parser_load_from_data(jsonparser, data, len, NULL)) {
+		g_message("failed to parse signature json");
+		goto err_parse;
+	}
+	JsonArray* sigarray = JSON_NODE_GET_ARRAY(json_parser_get_root(jsonparser));
+	if (sigarray != NULL) {
+		sigs = g_ptr_array_new();
+		json_array_foreach_element(sigarray, manifest_signature_deserialise,
+				sigs);
+	} else {
+		goto err_badroot;
+	}
+
+	if (sigs->len == 0) {
+		g_ptr_array_free(sigs, TRUE);
+		sigs = NULL;
+	}
+
+	err_parse: //
+	err_badroot: //
+
+	return sigs;
 }

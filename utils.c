@@ -1,5 +1,12 @@
 #include "utils.h"
 
+gchar* buildpath(const gchar* dir, const gchar* file) {
+	GString* pathgstr = g_string_new(dir);
+	g_string_append_c(pathgstr, '/');
+	g_string_append(pathgstr, file);
+	return g_string_free(pathgstr, FALSE);
+}
+
 void teenyhttp_hexdump(guint8* payload, gsize len) {
 	for (gsize i = 0; i < len; i += 8) {
 		GString* hexstr = g_string_new(NULL);

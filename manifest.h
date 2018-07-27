@@ -7,8 +7,11 @@ enum manifest_signaturetype {
 };
 
 struct manifest_image {
-	const gchar* name;
+	const gchar* uuid;
 	unsigned version;
+	gsize size;
+	gboolean enabled;
+	GPtrArray* tags;
 	GPtrArray* signatures;
 };
 
@@ -19,20 +22,25 @@ struct manifest_signature {
 
 struct manifest_manifest {
 	unsigned serial;
+	gint64 timestamp;
 	GPtrArray* images;
 };
 
-#define OTA_MANIFEST                 "manifest.json"
-#define OTA_SIG                      "sig.json"
+#define OTA_MANIFEST         "manifest.json"
+#define OTA_SIG              "sig.json"
+#define MANIFEST_CONTENTTYPE "application/json"
 
-#define OTA_JSONFIELD_SERIAL         "serial"
-#define MANIFEST_JSONFIELD_TIMESTAMP "timestamp"
-#define OTA_JSONFIELD_IMAGES         "images"
-#define OTA_JSONFIELD_IMAGE_NAME	 "name"
-#define OTA_JSONFIELD_IMAGE_VERSION  "version"
-#define OTA_JSONFIELD_SIGNATURES     "signatures"
-#define OTA_JSONFIELD_SIGNATURE_DATA "data"
-#define OTA_JSONFIELD_SIGNATURE_TYPE "type"
+#define MANIFEST_JSONFIELD_SERIAL         "serial"
+#define MANIFEST_JSONFIELD_TIMESTAMP      "timestamp"
+#define MANIFEST_JSONFIELD_IMAGES         "images"
+#define MANIFEST_JSONFIELD_IMAGE_UUID     "uuid"
+#define MANIFEST_JSONFIELD_IMAGE_VERSION  "version"
+#define MANIFEST_JSONFIELD_IMAGE_SIZE     "size"
+#define MANIFEST_JSONFIELD_IMAGE_TAGS     "tags"
+#define MANIFEST_JSONFIELD_IMAGE_ENABLED  "enabled"
+#define MANIFEST_JSONFIELD_SIGNATURES     "signatures"
+#define MANIFEST_JSONFIELD_SIGNATURE_DATA "data"
+#define MANIFEST_JSONFIELD_SIGNATURE_TYPE "type"
 
 #define OTA_SIGNATURE_TYPE_RSASHA256 "rsa-sha256"
 #define OTA_SIGNATURE_TYPE_RSASHA512 "rsa-sha512"
@@ -50,3 +58,4 @@ struct manifest_manifest* manifest_deserialise(const gchar* data, gsize len);
 struct manifest_image* manifest_image_new(void);
 struct manifest_manifest* manifest_new(void);
 void manifest_free(struct manifest_manifest* manifest);
+GPtrArray* manifest_signatures_deserialise(const gchar* data, gsize len);

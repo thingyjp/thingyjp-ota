@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #define DEFAULT_KEYSIZE 2048
+#define SIGBASE 16
 
 static gboolean crypto_genrsakey(struct rsa_public_key* pubkey,
 		struct rsa_private_key* privatekey, struct yarrow256_ctx* yarrowctx) {
@@ -44,6 +45,14 @@ static gboolean crypto_inityarrow(struct yarrow256_ctx* yarrowctx) {
 	return TRUE;
 }
 
+#define DOSHA256(data, len) struct sha256_ctx sha256hash; \
+							sha256_init(&sha256hash); \
+							sha256_update(&sha256hash, len, (unsigned char*) data)
+
+#define DOSHA512(data, len) struct sha512_ctx sha512hash; \
+							sha512_init(&sha512hash); \
+							sha512_update(&sha512hash, len, (unsigned char*) data)
+
 struct manifest_signature* crypto_sign(enum manifest_signaturetype sigtype,
 		struct crypto_keys* keys, guint8* data, gsize len) {
 
@@ -59,17 +68,13 @@ struct manifest_signature* crypto_sign(enum manifest_signaturetype sigtype,
 
 	switch (sigtype) {
 	case OTA_SIGTYPE_RSASHA256: {
-		struct sha256_ctx sha256hash;
-		sha256_init(&sha256hash);
-		sha256_update(&sha256hash, len, (unsigned char*) data);
+		DOSHA256(data, len);
 		rsa_sha256_sign_tr(&keys->pubkey, &keys->privatekey, &yarrowctx,
 				(nettle_random_func *) yarrow256_random, &sha256hash, sig);
 	}
 		break;
 	case OTA_SIGTYPE_RSASHA512: {
-		struct sha512_ctx sha512hash;
-		sha512_init(&sha512hash);
-		sha512_update(&sha512hash, len, (unsigned char*) data);
+		DOSHA512(data, len);
 		rsa_sha512_sign_tr(&keys->pubkey, &keys->privatekey, &yarrowctx,
 				(nettle_random_func *) yarrow256_random, &sha512hash, sig);
 	}
@@ -79,7 +84,7 @@ struct manifest_signature* crypto_sign(enum manifest_signaturetype sigtype,
 		goto err_sigtype;
 	}
 
-	char* sighex = mpz_get_str(NULL, 16, sig);
+	char* sighex = mpz_get_str(NULL, SIGBASE, sig);
 	//g_message("sig: %s", sighex);
 
 	s = g_malloc0(sizeof(*s));
@@ -93,7 +98,27 @@ struct manifest_signature* crypto_sign(enum manifest_signaturetype sigtype,
 
 gboolean crypto_verify(struct manifest_signature* signature,
 		struct crypto_keys* keys, guint8* data, gsize len) {
-	return FALSE;
+	gboolean ret = FALSE;
+
+	mpz_t sig;
+	mpz_init(sig);
+	mpz_set_str(sig, signature->data, SIGBASE);
+
+	switch (signature->type) {
+	case OTA_SIGTYPE_RSASHA256: {
+		DOSHA256(data, len);
+		ret = rsa_sha256_verify(&keys->pubkey, &sha256hash, sig);
+	}
+		break;
+	case OTA_SIGTYPE_RSASHA512: {
+		DOSHA512(data, len);
+		ret = rsa_sha512_verify(&keys->pubkey, &sha512hash, sig);
+	}
+		break;
+	default:
+		break;
+	}
+	return ret;
 }
 
 gboolean crypto_keygen(struct crypto_keys* keys) {
@@ -136,6 +161,7 @@ struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 	gsize rawpubkeysz;
 	if (!g_file_get_contents(rsapubkeypath, &rawpubkey, &rawpubkeysz, NULL)) {
 		g_message("failed to read rsa public key");
+		goto err_readpubkey;
 	}
 
 	gchar* rawprivkey;
@@ -143,6 +169,7 @@ struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 	if (!g_file_get_contents(rsaprivkeypath, &rawprivkey, &rawprivkeysz,
 	NULL)) {
 		g_message("failed to read rsa private key");
+		goto err_readprivkey;
 	}
 
 	struct crypto_keys* keys = g_malloc0(sizeof(*keys));
@@ -152,11 +179,23 @@ struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 	if (!rsa_keypair_from_sexp(&keys->pubkey,
 	NULL, 0, rawpubkeysz, (uint8_t*) rawpubkey)) {
 		g_message("failed to load rsa public key");
+		goto err_parsepubkey;
 	}
 	if (!rsa_keypair_from_sexp(&keys->pubkey, &keys->privatekey, 0,
 			rawprivkeysz, (uint8_t*) rawprivkey)) {
 		g_message("failed to load rsa private key");
+		goto err_parseprivkey;
 	}
 
+	err_parseprivkey: //
+	err_parsepubkey: //
+	g_free(rawprivkey);
+	err_readprivkey: //
+	g_free(rawpubkey);
+	err_readpubkey: //
 	return keys;
+}
+
+void crypto_keys_free(struct crypto_keys* keys) {
+	g_free(keys);
 }
