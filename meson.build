@@ -4,7 +4,7 @@ ota_src = ['ota.c', 'teenyhttp.c', 'crypto.c', 'utils.c', 'manifest.c']
 repo_src = ['repo.c', 'crypto.c', 'utils.c', 'manifest.c']
 keygen_src = ['keygen.c', 'crypto.c', 'utils.c']
 
-incs = include_directories(['../thingymcconfig/include/', 'json-glib-macros'])
+incs = include_directories(['json-glib-macros'])
   
 cc = meson.get_compiler('c')
 
