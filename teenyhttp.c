@@ -69,9 +69,9 @@ static void teenyhttp_munchheaders(const gchar* headers,
 			g_match_info_next(matchinfo, NULL)) {
 		gchar* header = g_match_info_fetch(matchinfo, 1);
 		gchar* value = g_match_info_fetch(matchinfo, 2);
-//#ifdef TEENYHTTP_DEBUG
+#ifdef TEENYHTTP_DEBUG
 		g_message("http header; header:%s, value:%s", header, value);
-//#endif
+#endif
 		for (int i = 0; i < G_N_ELEMENTS(headerhandlers); i++)
 			if (strcmp(header, headerhandlers[i].header) == 0)
 				headerhandlers[i].handler(header, value, response);
@@ -166,17 +166,21 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 		teenyhttp_munchpayload(payload, payloadlen, datacallback,
 				datacallback_user_data);
 		while (response.contentleft > 0) {
+			g_message("%u left", response.contentleft);
 			gsize want = MIN(TEENYHTTP_READBUFFSZ, response.contentleft);
 			read = g_input_stream_read(
 					g_io_stream_get_input_stream(G_IO_STREAM(socketconnection)),
 					readbuff, want, NULL, NULL);
 
-			if (read != want)
+			if (read < 0) {
+				g_message("failed to read %d", read);
 				goto err_read;
-
-			teenyhttp_munchpayload(readbuff, read, datacallback,
-					datacallback_user_data);
-			response.contentleft -= read;
+			}
+			if (read > 0) {
+				teenyhttp_munchpayload(readbuff, read, datacallback,
+						datacallback_user_data);
+				response.contentleft -= read;
+			}
 		}
 	}
 
@@ -189,4 +193,16 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 	err_connect: //
 	g_object_unref(socketconnection);
 	return ret;
+}
+
+static gboolean teenyhttp_defaultresponsecallback(
+		const struct teenyhttp_response* response, gpointer user_data) {
+	const gchar* contenttype = user_data;
+	return response->code == 200;
+}
+
+gboolean teenyhttp_get_simple(const gchar* host, const gchar* path,
+		teenyhttp_datacallback datacallback, gpointer datacallback_user_data) {
+	return teenyhttp_get(host, path, teenyhttp_defaultresponsecallback, NULL,
+			datacallback, datacallback_user_data);
 }

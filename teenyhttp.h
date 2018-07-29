@@ -2,7 +2,7 @@
 
 #include <glib.h>
 
-#define TEENYHTTP_DEBUG
+//#define TEENYHTTP_DEBUG
 
 struct teenyhttp_response {
 	unsigned code;
@@ -21,4 +21,6 @@ void teenyhttp_init(void);
 gboolean teenyhttp_get(const gchar* host, const gchar* path,
 		teenyhttp_responsecallback responsecallback,
 		gpointer responsecallback_user_data,
+		teenyhttp_datacallback datacallback, gpointer datacallback_user_data);
+gboolean teenyhttp_get_simple(const gchar* host, const gchar* path,
 		teenyhttp_datacallback datacallback, gpointer datacallback_user_data);

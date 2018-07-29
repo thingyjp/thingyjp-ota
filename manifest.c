@@ -114,7 +114,7 @@ static void manifest_image_serialise(gpointer data, gpointer user_data) {
 static void manifest_image_deserialise(JsonArray *array, guint index,
 		JsonNode *element_node, gpointer user_data) {
 	GPtrArray* manifest_images = user_data;
-	struct manifest_image* manifest_image = manifest_image_new();
+	struct manifest_image* image = manifest_image_new();
 
 	gchar* uuid;
 	int version;
@@ -127,6 +127,8 @@ static void manifest_image_deserialise(JsonArray *array, guint index,
 				MANIFEST_JSONFIELD_SIGNATURES);
 		version = JSON_OBJECT_GET_MEMBER_INT(imageobj,
 				MANIFEST_JSONFIELD_IMAGE_VERSION);
+		image->enabled = JSON_OBJECT_GET_MEMBER_BOOL(imageobj,
+				MANIFEST_JSONFIELD_IMAGE_ENABLED);
 		size = JSON_OBJECT_GET_MEMBER_INT(imageobj,
 				MANIFEST_JSONFIELD_IMAGE_SIZE);
 		if (uuid == NULL || signatures == NULL || version == -1 || size <= 0) {
@@ -134,26 +136,26 @@ static void manifest_image_deserialise(JsonArray *array, guint index,
 			goto err_parse;
 		}
 		json_array_foreach_element(signatures, manifest_signature_deserialise,
-				manifest_image->signatures);
+				image->signatures);
 	} else {
 		g_message("image element isn't an object");
 		goto err_parse;
 	}
 
-	if (manifest_image->signatures->len == 0) {
+	if (image->signatures->len == 0) {
 		g_message("image has no usable signatures");
 		goto err_parse;
 	}
 
-	manifest_image->uuid = g_strdup(uuid);
-	manifest_image->version = version;
-	manifest_image->size = size;
+	image->uuid = g_strdup(uuid);
+	image->version = version;
+	image->size = size;
 
-	g_ptr_array_add(manifest_images, manifest_image);
+	g_ptr_array_add(manifest_images, image);
 	return;
 
 	err_parse: //
-	manifest_image_free(manifest_image);
+	manifest_image_free(image);
 	return;
 }
 

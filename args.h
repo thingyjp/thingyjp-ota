@@ -7,6 +7,8 @@
 // for ota only
 #define ARGS_HOST    { "host", 'h', 0, G_OPTION_ARG_STRING, &host,"OTA server host", NULL}
 #define ARGS_PATH    { "path", 'p', 0, G_OPTION_ARG_STRING, &path,"path", NULL}
+#define ARGS_MTD     { "mtd", 'm', 0, G_OPTION_ARG_STRING_ARRAY, &mtds,"mtd", NULL}
+#define ARGS_DRYRUN  { "dryrun", 0, 0, G_OPTION_ARG_NONE, &dryrun,"Don't actually apply updates", NULL}
 
 // for repo only
 #define ARGS_ACTION_LIST   {"list", 0, 0, G_OPTION_ARG_NONE, &action_list, "list images", NULL}

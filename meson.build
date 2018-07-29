@@ -1,6 +1,6 @@
 project('ota', 'c')
 
-ota_src = ['ota.c', 'teenyhttp.c', 'crypto.c', 'utils.c', 'manifest.c']
+ota_src = ['ota.c', 'teenyhttp.c', 'crypto.c', 'utils.c', 'manifest.c', 'mtd.c']
 repo_src = ['repo.c', 'crypto.c', 'utils.c', 'manifest.c']
 keygen_src = ['keygen.c', 'crypto.c', 'utils.c']
 

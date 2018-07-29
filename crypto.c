@@ -164,32 +164,39 @@ struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 		goto err_readpubkey;
 	}
 
-	gchar* rawprivkey;
+	gchar* rawprivkey = NULL;
 	gsize rawprivkeysz;
-	if (!g_file_get_contents(rsaprivkeypath, &rawprivkey, &rawprivkeysz,
-	NULL)) {
-		g_message("failed to read rsa private key");
-		goto err_readprivkey;
+	if (rsaprivkeypath != NULL) {
+		if (!g_file_get_contents(rsaprivkeypath, &rawprivkey, &rawprivkeysz,
+		NULL)) {
+			g_message("failed to read rsa private key");
+			goto err_readprivkey;
+		}
 	}
 
 	struct crypto_keys* keys = g_malloc0(sizeof(*keys));
 	rsa_public_key_init(&keys->pubkey);
-	rsa_private_key_init(&keys->privatekey);
+	if (rsaprivkeypath != NULL)
+		rsa_private_key_init(&keys->privatekey);
 
 	if (!rsa_keypair_from_sexp(&keys->pubkey,
 	NULL, 0, rawpubkeysz, (uint8_t*) rawpubkey)) {
 		g_message("failed to load rsa public key");
 		goto err_parsepubkey;
 	}
-	if (!rsa_keypair_from_sexp(&keys->pubkey, &keys->privatekey, 0,
-			rawprivkeysz, (uint8_t*) rawprivkey)) {
-		g_message("failed to load rsa private key");
-		goto err_parseprivkey;
+
+	if (rsaprivkeypath != NULL) {
+		if (!rsa_keypair_from_sexp(&keys->pubkey, &keys->privatekey, 0,
+				rawprivkeysz, (uint8_t*) rawprivkey)) {
+			g_message("failed to load rsa private key");
+			goto err_parseprivkey;
+		}
 	}
 
 	err_parseprivkey: //
 	err_parsepubkey: //
-	g_free(rawprivkey);
+	if (rsaprivkeypath != NULL)
+		g_free(rawprivkey);
 	err_readprivkey: //
 	g_free(rawpubkey);
 	err_readpubkey: //
