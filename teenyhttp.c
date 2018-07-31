@@ -192,8 +192,8 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 	g_free(readbuff);
 	err_sendreq: //
 	g_free(request);
-	err_connect: //
 	g_object_unref(socketconnection);
+	err_connect: //
 	return ret;
 }
 
