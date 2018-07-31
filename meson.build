@@ -18,6 +18,6 @@ deps = [dependency('glib-2.0'),
 add_global_arguments('-ggdb', language : 'c')
 add_global_arguments('-Werror=implicit-function-declaration', language : 'c')
 
-executable('ota', ota_src, include_directories : incs, dependencies : deps)
+executable('ota', ota_src, include_directories : incs, dependencies : deps, install : true, install_dir : 'sbin')
 executable('repo', repo_src, include_directories : incs, dependencies : deps)
 executable('keygen', keygen_src, include_directories : incs, dependencies : deps)
