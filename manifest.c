@@ -1,6 +1,7 @@
 #include "manifest.h"
 #include "jsonparserutils.h"
 #include "jsonbuilderutils.h"
+#include "utils.h"
 
 struct manifest_signature* manifest_signature_new() {
 	struct manifest_signature* signature = g_malloc0(sizeof(*signature));
@@ -265,4 +266,19 @@ GPtrArray* manifest_signatures_deserialise(const gchar* data, gsize len) {
 	err_badroot: //
 
 	return sigs;
+}
+
+struct manifest_manifest* manifest_load(const gchar* path) {
+	struct manifest_manifest* manifest = manifest_new();
+	gchar* existingmanifest;
+	gsize existingmanifestsz;
+	if (g_file_get_contents(path, &existingmanifest, &existingmanifestsz,
+	NULL)) {
+		if (!manifest_deserialise_into(manifest, existingmanifest,
+				existingmanifestsz)) {
+			g_message("existing manifest is corrupt");
+		}
+		g_free(existingmanifest);
+	}
+	return manifest;
 }

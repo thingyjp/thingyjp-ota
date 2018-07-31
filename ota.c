@@ -32,7 +32,7 @@ static void updatemanifest() {
 		return;
 	}
 
-	gchar* sigpath = buildpath(path, OTA_SIG);
+	gchar* sigpath = buildpath(path, OTA_SIG, NULL);
 	GByteArray* sigbuffer = g_byte_array_new();
 	if (!teenyhttp_get(host, sigpath, responsecallback,
 	MANIFEST_CONTENTTYPE, teenyhttp_datacallback_bytebuffer, sigbuffer)) {
@@ -47,7 +47,7 @@ static void updatemanifest() {
 		goto err_parsesig;
 	}
 
-	gchar* manifestpath = buildpath(path, OTA_MANIFEST);
+	gchar* manifestpath = buildpath(path, OTA_MANIFEST, NULL);
 	GByteArray* manifestbuffer = g_byte_array_new();
 	if (!teenyhttp_get(host, manifestpath, responsecallback,
 	MANIFEST_CONTENTTYPE, teenyhttp_datacallback_bytebuffer, manifestbuffer)) {
@@ -146,7 +146,7 @@ static void ota_tryupdate() {
 	if (targetimage == NULL)
 		return;
 
-	gchar* imagepath = buildpath(path, targetimage->uuid);
+	gchar* imagepath = buildpath(path, targetimage->uuid, NULL);
 	GByteArray* imagebuffer = g_byte_array_new();
 	teenyhttp_get_simple(host, imagepath, teenyhttp_datacallback_bytebuffer,
 			imagebuffer);
@@ -200,23 +200,17 @@ int main(int argc, char** argv) {
 	int ret = 0;
 	host = "thingy.jp";
 	path = "/ota/spibeagle";
-	gchar* keysdir = NULL;
+	gchar* arg_configdir = OTA_CONFIGDIR_DEFAULT;
 
 	GError* error = NULL;
-	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_KEYDIR, ARGS_MTD,
-	ARGS_DRYRUN, {
-	NULL } };
+	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_CONFIGDIR, ARGS_MTD,
+	ARGS_DRYRUN, { NULL } };
 	GOptionContext* optioncontext = g_option_context_new(NULL);
 	g_option_context_add_main_entries(optioncontext, entries,
 	GETTEXT_PACKAGE);
 	if (!g_option_context_parse(optioncontext, &argc, &argv, &error)) {
 		g_print("option parsing failed: %s\n", error->message);
 		ret = 1;
-		goto err_args;
-	}
-
-	if (keysdir == NULL) {
-		g_message("you must pass the path of the keys directory");
 		goto err_args;
 	}
 
@@ -233,7 +227,8 @@ int main(int argc, char** argv) {
 			goto err_mtdinit;
 	}
 
-	gchar* pubkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PUB);
+	gchar* pubkeypath = buildpath(arg_configdir, OTA_CONFIGDIR_SUBDIR_KEYS,
+	CRYPTO_KEYNAME_RSA_PUB, NULL);
 	keys = crypto_readkeys(pubkeypath, NULL);
 	g_free(pubkeypath);
 	if (keys == NULL) {

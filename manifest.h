@@ -59,3 +59,4 @@ struct manifest_image* manifest_image_new(void);
 struct manifest_manifest* manifest_new(void);
 void manifest_free(struct manifest_manifest* manifest);
 GPtrArray* manifest_signatures_deserialise(const gchar* data, gsize len);
+struct manifest_manifest* manifest_load(const gchar* path);

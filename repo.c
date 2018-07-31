@@ -1,14 +1,16 @@
 #define GETTEXT_PACKAGE "gtk20"
 #include <json-glib/json-glib.h>
 #include "jsonbuilderutils.h"
+#include "jsonparserutils.h"
 #include "crypto.h"
 #include "manifest.h"
 #include "args.h"
 #include "utils.h"
+#include "stamp.h"
 
 static const enum manifest_signaturetype sigtypes[] = { OTA_SIGTYPE_RSASHA256,
 		OTA_SIGTYPE_RSASHA512 };
-static gchar* repodir = NULL;
+static gchar* arg_repodir = NULL;
 static gchar* keysdir = NULL;
 static gchar* manifestpath;
 static gchar* sigpath;
@@ -38,24 +40,9 @@ static GHashTable* createsigimagetable(const struct manifest_manifest* manifest)
 	return t;
 }
 
-static struct manifest_manifest* repo_manifest_load() {
-	struct manifest_manifest* manifest = manifest_new();
-	gchar* existingmanifest;
-	gsize existingmanifestsz;
-	if (g_file_get_contents(manifestpath, &existingmanifest,
-			&existingmanifestsz, NULL)) {
-		if (!manifest_deserialise_into(manifest, existingmanifest,
-				existingmanifestsz)) {
-			g_message("existing manifest is corrupt");
-		}
-		g_free(existingmanifest);
-	}
-	return manifest;
-}
-
 static struct crypto_keys* repo_keys_load() {
-	gchar* pubkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PUB);
-	gchar* privkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PRIV);
+	gchar* pubkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PUB, NULL);
+	gchar* privkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PRIV, NULL);
 	struct crypto_keys* keys = crypto_readkeys(pubkeypath, privkeypath);
 	g_free(pubkeypath);
 	g_free(privkeypath);
@@ -71,7 +58,7 @@ static void repo_image_list_printimage(gpointer data, gpointer user_data) {
 }
 
 static void repo_image_list() {
-	struct manifest_manifest* manifest = repo_manifest_load();
+	struct manifest_manifest* manifest = manifest_load(manifestpath);
 	int index = 0;
 	g_message("have %d images", manifest->images->len);
 	g_ptr_array_foreach(manifest->images, repo_image_list_printimage, &index);
@@ -105,12 +92,18 @@ static gboolean findbyversion(gconstpointer a, gconstpointer b) {
 	return ((struct manifest_image*) a)->version == GPOINTER_TO_UINT(b);
 }
 
-static void repo_image_add(const gchar* imagepath, guint version) {
-	struct manifest_manifest* manifest = repo_manifest_load();
+static void repo_image_add(const gchar* imagepath, const gchar* stamp) {
+	struct manifest_manifest* manifest = manifest_load(manifestpath);
+
+	struct stamp_stamp* s = stamp_loadstamp(stamp);
+	if (s == NULL) {
+		g_message("failed to load stamp");
+		return;
+	}
 
 	if (g_ptr_array_find_with_equal_func(manifest->images,
-			GUINT_TO_POINTER(version), findbyversion, NULL)) {
-		g_message("version %u already exists", version);
+			GUINT_TO_POINTER(s->version), findbyversion, NULL)) {
+		g_message("version %u already exists", s->version);
 		goto err_verexists;
 	}
 
@@ -137,14 +130,14 @@ static void repo_image_add(const gchar* imagepath, guint version) {
 		}
 	}
 
-	image->uuid = g_uuid_string_random();
-	image->version = version;
+	image->uuid = s->uuid;
+	image->version = s->version;
 	image->size = imagesz;
 	image->enabled = TRUE;
 	g_ptr_array_add(manifest->images, image);
 
 	GError* imagewriteerr = NULL;
-	gchar* imageinrepo = buildpath(repodir, image->uuid);
+	gchar* imageinrepo = buildpath(arg_repodir, image->uuid, NULL);
 	if (!g_file_set_contents(imageinrepo, imagedata, imagesz, &imagewriteerr)) {
 		g_message("failed to write image data; %s", imagewriteerr->message);
 		goto err_writeimage;
@@ -160,6 +153,7 @@ static void repo_image_add(const gchar* imagepath, guint version) {
 	crypto_keys_free(keys);
 	err_readimage: //
 	err_verexists: //
+	stamp_freestamp(s);
 	manifest_free(manifest);
 
 	return;
@@ -170,7 +164,7 @@ static void repo_image_update(guint index) {
 }
 
 static void repo_image_delete(guint index) {
-	struct manifest_manifest* manifest = repo_manifest_load();
+	struct manifest_manifest* manifest = manifest_load(manifestpath);
 	struct crypto_keys* keys = repo_keys_load();
 
 	if (index >= manifest->images->len) {
@@ -192,7 +186,7 @@ static void repo_verify_verifyimage(gpointer data, gpointer user_data) {
 	struct manifest_image* image = data;
 	int imageerr = IMAGEERR_NONE;
 	g_message("checking image %s...", image->uuid);
-	gchar* imagepath = buildpath(repodir, image->uuid);
+	gchar* imagepath = buildpath(arg_repodir, image->uuid, NULL);
 	gsize imagesz;
 	gchar* imagedata;
 
@@ -214,7 +208,7 @@ static void repo_verify_verifyimage(gpointer data, gpointer user_data) {
 }
 
 static void repo_verify() {
-	struct manifest_manifest* manifest = repo_manifest_load();
+	struct manifest_manifest* manifest = manifest_load(manifestpath);
 	struct crypto_keys* keys = repo_keys_load();
 	g_ptr_array_foreach(manifest->images, repo_verify_verifyimage, NULL);
 	crypto_keys_free(keys);
@@ -259,13 +253,13 @@ static gboolean findbyuuid(gconstpointer a, gconstpointer b) {
 }
 
 static void repo_repair() {
-	struct manifest_manifest* manifest = repo_manifest_load();
+	struct manifest_manifest* manifest = manifest_load(manifestpath);
 	struct crypto_keys* keys = repo_keys_load();
 
 	guint lenbefore = manifest->images->len;
 
 	// find any images in the repo that aren't listed in the manifest
-	GDir* dir = g_dir_open(repodir, 0, NULL);
+	GDir* dir = g_dir_open(arg_repodir, 0, NULL);
 	for (const gchar* filename = g_dir_read_name(dir); filename != NULL;
 			filename = g_dir_read_name(dir)) {
 		if (strcmp(filename, OTA_MANIFEST) == 0
@@ -274,7 +268,7 @@ static void repo_repair() {
 		if (!g_ptr_array_find_with_equal_func(manifest->images, filename,
 				findbyuuid, NULL)) {
 			g_message("deleting dangling image %s", filename);
-			gchar* imagepath = buildpath(repodir, filename);
+			gchar* imagepath = buildpath(arg_repodir, filename, NULL);
 			unlink(imagepath);
 			g_free(imagepath);
 		}
@@ -310,7 +304,7 @@ int main(int argc, char** argv) {
 	gboolean action_repair = FALSE;
 	gchar* param_imagepath = NULL;
 	gint param_imageindex = -1;
-	gint param_imageversion = -1;
+	gchar* param_stamp = NULL;
 	gchar** param_imagetags = NULL;
 	gchar* param_imageenabled = "true";
 
@@ -322,7 +316,7 @@ int main(int argc, char** argv) {
 			ARGS_ACTION_REPAIR,
 			//
 			ARGS_PARAMETER_IMAGEPATH, ARGS_PARAMETER_IMAGEINDEX,
-			ARGS_PARAMETER_IMAGEVERSION, ARGS_PARAMETER_IMAGETAGS,
+			ARGS_PARAMETER_IMAGESTAMP, ARGS_PARAMETER_IMAGETAGS,
 			ARGS_PARAMETER_IMAGEENABLED,
 			//
 			{ NULL } };
@@ -337,7 +331,7 @@ int main(int argc, char** argv) {
 		goto err_args;
 	}
 
-	if (repodir == NULL) {
+	if (arg_repodir == NULL) {
 		g_message("you must pass a directory for the repo");
 		goto err_args;
 	}
@@ -353,13 +347,13 @@ int main(int argc, char** argv) {
 		goto err_args;
 	}
 
-	if (g_mkdir_with_parents(repodir, 0700) > 0) {
+	if (g_mkdir_with_parents(arg_repodir, 0700) > 0) {
 		g_message("failed to create repo dir");
 		goto err_createdir;
 	}
 
-	manifestpath = buildpath(repodir, OTA_MANIFEST);
-	sigpath = buildpath(repodir, OTA_SIG);
+	manifestpath = buildpath(arg_repodir, OTA_MANIFEST, NULL);
+	sigpath = buildpath(arg_repodir, OTA_SIG, NULL);
 
 	if (action_list)
 		repo_image_list();
@@ -368,11 +362,11 @@ int main(int argc, char** argv) {
 			g_message("you must pass the path of the image to add");
 			goto err_args;
 		}
-		if (param_imageversion < 0) {
-			g_message("you must pass the version of the image being added");
+		if (param_stamp == NULL) {
+			g_message("you must pass the path of the image stamp file");
 			goto err_args;
 		}
-		repo_image_add(param_imagepath, param_imageversion);
+		repo_image_add(param_imagepath, param_stamp);
 	} else if (action_update) {
 		repo_image_update(param_imageindex);
 	} else if (action_delete) {
