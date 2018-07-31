@@ -1,0 +1,2 @@
+option('host', type : 'boolean', value : false, 
+       description : 'build and install host tools')

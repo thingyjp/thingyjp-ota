@@ -1,6 +1,7 @@
 project('ota', 'c')
 
 ota_src = ['ota.c', 'teenyhttp.c', 'crypto.c', 'utils.c', 'manifest.c', 'mtd.c']
+stamp_src = ['stamp.c']
 repo_src = ['repo.c', 'crypto.c', 'utils.c', 'manifest.c']
 keygen_src = ['keygen.c', 'crypto.c', 'utils.c']
 
@@ -18,6 +19,10 @@ deps = [dependency('glib-2.0'),
 add_global_arguments('-ggdb', language : 'c')
 add_global_arguments('-Werror=implicit-function-declaration', language : 'c')
 
-executable('ota', ota_src, include_directories : incs, dependencies : deps, install : true, install_dir : 'sbin')
-executable('repo', repo_src, include_directories : incs, dependencies : deps)
-executable('keygen', keygen_src, include_directories : incs, dependencies : deps)
+if get_option('host')
+ executable('ota_stamp', stamp_src, include_directories : incs, dependencies : deps)
+ executable('ota_repo', repo_src, include_directories : incs, dependencies : deps)
+ executable('ota_keygen', keygen_src, include_directories : incs, dependencies : deps)
+else
+ executable('ota', ota_src, include_directories : incs, dependencies : deps, install : true, install_dir : 'sbin')
+endif
