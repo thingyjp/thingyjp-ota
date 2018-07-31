@@ -20,9 +20,9 @@ add_global_arguments('-ggdb', language : 'c')
 add_global_arguments('-Werror=implicit-function-declaration', language : 'c')
 
 if get_option('host')
- executable('ota_stamp', stamp_src, include_directories : incs, dependencies : deps)
- executable('ota_repo', repo_src, include_directories : incs, dependencies : deps)
- executable('ota_keygen', keygen_src, include_directories : incs, dependencies : deps)
+ executable('ota_stamp', stamp_src, include_directories : incs, dependencies : deps, install : true)
+ executable('ota_repo', repo_src, include_directories : incs, dependencies : deps, install : true)
+ executable('ota_keygen', keygen_src, include_directories : incs, dependencies : deps, install : true)
 else
  executable('ota', ota_src, include_directories : incs, dependencies : deps, install : true, install_dir : 'sbin')
 endif
