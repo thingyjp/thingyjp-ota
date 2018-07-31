@@ -143,15 +143,17 @@ static void repo_image_add(const gchar* imagepath, guint version) {
 	image->enabled = TRUE;
 	g_ptr_array_add(manifest->images, image);
 
+	GError* imagewriteerr = NULL;
 	gchar* imageinrepo = buildpath(repodir, image->uuid);
-	if (!g_file_set_contents(imageinrepo, imagedata, imagesz, NULL)) {
-		g_message("failed to write image data");
+	if (!g_file_set_contents(imageinrepo, imagedata, imagesz, &imagewriteerr)) {
+		g_message("failed to write image data; %s", imagewriteerr->message);
 		goto err_writeimage;
 	}
 
 	repo_updatemanifest(manifest, keys);
 
 	err_writeimage: //
+	g_clear_error(&imagewriteerr);
 	g_free(imageinrepo);
 	err_sigexists: //
 	g_free(imagedata);
@@ -193,6 +195,7 @@ static void repo_verify_verifyimage(gpointer data, gpointer user_data) {
 	gchar* imagepath = buildpath(repodir, image->uuid);
 	gsize imagesz;
 	gchar* imagedata;
+
 	GError* err = NULL;
 	if (!g_file_get_contents(imagepath, &imagedata, &imagesz, &err)) {
 		g_message("failed to load image data; %s", err->message);
@@ -201,6 +204,7 @@ static void repo_verify_verifyimage(gpointer data, gpointer user_data) {
 	}
 
 	err_loadimage: //
+	g_clear_error(&err);
 	g_free(imagepath);
 
 	if (user_data != NULL && imageerr != IMAGEERR_NONE) {
