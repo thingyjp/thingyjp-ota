@@ -70,3 +70,9 @@ myimage_1.fit
 		"data": "xxx"
 	}
 ]
+
+## Hacking/Testing
+
+```
+modprobe nandsim id_bytes=01,53,03,01,10 parts=1024,1024
+```

@@ -203,6 +203,21 @@ struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 	return keys;
 }
 
+void crypto_checksig(gpointer data, gpointer user_data) {
+	struct manifest_signature* sig = data;
+	struct crypto_checksigcntx* cntx = user_data;
+
+	if (!cntx->cont)
+		return;
+
+	g_message("validating %s with %s", cntx->what,
+			manifest_signaturetypestrings[sig->type]);
+	cntx->cont = crypto_verify(sig, cntx->keys, cntx->data, cntx->len);
+	if (!cntx->cont) {
+		g_message("sig check failed");
+	}
+}
+
 void crypto_keys_free(struct crypto_keys* keys) {
 	g_free(keys);
 }

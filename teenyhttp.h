@@ -24,3 +24,5 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 		teenyhttp_datacallback datacallback, gpointer datacallback_user_data);
 gboolean teenyhttp_get_simple(const gchar* host, const gchar* path,
 		teenyhttp_datacallback datacallback, gpointer datacallback_user_data);
+gboolean teenyhttp_datacallback_bytebuffer(guint8* data, gsize len,
+		gpointer user_data);

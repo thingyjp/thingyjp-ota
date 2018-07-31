@@ -6,6 +6,7 @@
 #include "crypto.h"
 #include "manifest.h"
 #include "utils.h"
+#include "mtd.h"
 
 static gchar* host;
 static gchar* path;
@@ -15,6 +16,7 @@ static guint currentversion = 0;
 static gint64 manifestfetchedat;
 static struct manifest_image* targetimage = NULL;
 static gboolean waitingtoreboot = FALSE;
+static gboolean dryrun = FALSE;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -23,74 +25,46 @@ static gboolean responsecallback(const struct teenyhttp_response* response,
 			&& (strcmp(contenttype, response->contenttype) == 0);
 }
 
-static gboolean bytebuffercallback(guint8* data, gsize len, gpointer user_data) {
-	GByteArray* buffer = user_data;
-	g_byte_array_append(buffer, data, len);
-	g_message("have %u bytes", buffer->len);
-	return TRUE;
-}
-
-struct checksigcntx {
-	const gchar* what;
-	guint8* data;
-	gsize len;
-	struct crypto_keys* keys;
-	gboolean cont;
-};
-
-static void checksig(gpointer data, gpointer user_data) {
-	struct manifest_signature* sig = data;
-	struct checksigcntx* cntx = user_data;
-
-	if (!cntx->cont)
-		return;
-
-	g_message("validating %s with %s", cntx->what,
-			manifest_signaturetypestrings[sig->type]);
-	cntx->cont = crypto_verify(sig, cntx->keys, cntx->data, cntx->len);
-	if (!cntx->cont) {
-		g_message("sig check failed");
-	}
-}
-
 static void updatemanifest() {
 	if (targetimage != NULL) {
 		g_message("target image selected, not updating manifest");
 		return;
 	}
 
+	gchar* sigpath = buildpath(path, OTA_SIG);
 	GByteArray* sigbuffer = g_byte_array_new();
-	if (!teenyhttp_get(host, "/ota/spibeagle/" OTA_SIG, responsecallback,
-	MANIFEST_CONTENTTYPE, bytebuffercallback, sigbuffer)) {
+	if (!teenyhttp_get(host, sigpath, responsecallback,
+	MANIFEST_CONTENTTYPE, teenyhttp_datacallback_bytebuffer, sigbuffer)) {
 		g_message("failed to fetch sig");
 		goto err_fetchsig;
 	}
 
-	GPtrArray* sigs = manifest_signatures_deserialise(sigbuffer->data,
+	GPtrArray* sigs = manifest_signatures_deserialise((gchar*) sigbuffer->data,
 			sigbuffer->len);
 	if (sigs == NULL) {
 		g_message("failed to parse signatures or no usable signatures");
 		goto err_parsesig;
 	}
 
+	gchar* manifestpath = buildpath(path, OTA_MANIFEST);
 	GByteArray* manifestbuffer = g_byte_array_new();
-	if (!teenyhttp_get(host, "/ota/spibeagle/" OTA_MANIFEST, responsecallback,
-	MANIFEST_CONTENTTYPE, bytebuffercallback, manifestbuffer)) {
+	if (!teenyhttp_get(host, manifestpath, responsecallback,
+	MANIFEST_CONTENTTYPE, teenyhttp_datacallback_bytebuffer, manifestbuffer)) {
 		g_message("failed to fetch manifest");
 		goto err_fetchmanifest;
 	}
 
-	struct checksigcntx chksigcntx = { .what = "manifest", .data =
+	struct crypto_checksigcntx chksigcntx = { .what = "manifest", .data =
 			manifestbuffer->data, .len = manifestbuffer->len, .keys = keys,
 			.cont = TRUE };
-	g_ptr_array_foreach(sigs, checksig, &chksigcntx);
+	g_ptr_array_foreach(sigs, crypto_checksig, &chksigcntx);
 	if (!chksigcntx.cont) {
 		g_message("manifest sig check failed");
 		goto err_manifestsig;
 	}
 
 	struct manifest_manifest* newmanifest = manifest_deserialise(
-			manifestbuffer->data, manifestbuffer->len);
+			(gchar*) manifestbuffer->data, manifestbuffer->len);
 	if (newmanifest == NULL) {
 		g_message("failed to parse manifest");
 		goto err_manifestparse;
@@ -112,9 +86,11 @@ static void updatemanifest() {
 	err_manifestparse: //
 	err_manifestsig: //
 	err_fetchmanifest: //
+	g_free(manifestpath);
 	g_byte_array_free(manifestbuffer, TRUE);
 	err_parsesig: //
 	err_fetchsig: //
+	g_free(sigpath);
 	g_byte_array_free(sigbuffer, TRUE);
 }
 
@@ -167,30 +143,41 @@ static void ota_tryupdate() {
 
 	gchar* imagepath = buildpath(path, targetimage->uuid);
 	GByteArray* imagebuffer = g_byte_array_new();
-	teenyhttp_get_simple(host, imagepath, bytebuffercallback, imagebuffer);
+	teenyhttp_get_simple(host, imagepath, teenyhttp_datacallback_bytebuffer,
+			imagebuffer);
 
 	if (imagebuffer->len != targetimage->size) {
-		g_message("downloaded image size doesn't match manifest %u vs %u",
+		g_message(
+				"downloaded image size doesn't match manifest %u vs %" G_GSIZE_FORMAT,
 				imagebuffer->len, targetimage->size);
 		goto err_imagelen;
 	}
 
-	struct checksigcntx cntx = { .what = "image", .data = imagebuffer->data,
-			.len = imagebuffer->len, .keys = keys, .cont = TRUE };
-	g_ptr_array_foreach(targetimage->signatures, checksig, &cntx);
+	struct crypto_checksigcntx cntx = { .what = "image", .data =
+			imagebuffer->data, .len = imagebuffer->len, .keys = keys, .cont =
+	TRUE };
+	g_ptr_array_foreach(targetimage->signatures, crypto_checksig, &cntx);
 	if (!cntx.cont) {
 		g_message("image signature verification failed");
 		goto err_imagesig;
 	}
 
-	g_message("erasing passive partition...");
+	if (!dryrun) {
+		g_message("erasing passive partition...");
+		if (!mtd_erase("/dev/mtd0"))
+			goto err_mtderase;
 
-	g_message("installing image...");
+		g_message("installing image...");
+		if (!mtd_writeimage("/dev/mtd0", imagebuffer->data, imagebuffer->len))
+			goto err_mtdwrite;
 
-	g_message("scheduling reboot...");
+		g_message("scheduling reboot...");
 
-	waitingtoreboot = TRUE;
+		waitingtoreboot = TRUE;
+	}
 
+	err_mtdwrite: //
+	err_mtderase: //
 	err_imagelen: //
 	err_imagesig: //
 	g_byte_array_free(imagebuffer, TRUE);
@@ -200,7 +187,7 @@ static gboolean timeout(gpointer user_data) {
 	updatemanifest();
 	ota_checkimages();
 	ota_tryupdate();
-	return G_SOURCE_CONTINUE;
+	return waitingtoreboot ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
 }
 
 int main(int argc, char** argv) {
@@ -209,11 +196,10 @@ int main(int argc, char** argv) {
 	path = "/ota/spibeagle";
 	gchar* keysdir = NULL;
 	gchar** mtds = NULL;
-	gboolean dryrun = FALSE;
 
 	GError* error = NULL;
 	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_KEYDIR, ARGS_MTD,
-			ARGS_DRYRUN, {
+	ARGS_DRYRUN, {
 	NULL } };
 	GOptionContext* optioncontext = g_option_context_new(NULL);
 	g_option_context_add_main_entries(optioncontext, entries,
@@ -227,6 +213,21 @@ int main(int argc, char** argv) {
 	if (keysdir == NULL) {
 		g_message("you must pass the path of the keys directory");
 		goto err_args;
+	}
+
+	if (!dryrun) {
+		int nummtds = g_strv_length(mtds);
+		if (mtds == NULL || nummtds < 2) {
+			g_message("you must specify at least two mtd partitions");
+			goto err_args;
+		}
+
+		if (nummtds > 2) {
+			//TODO some message about not using more than two mtds here
+		}
+
+		if (!mtd_init(mtds))
+			goto err_mtdinit;
 	}
 
 	gchar* pubkeypath = buildpath(keysdir, CRYPTO_KEYNAME_RSA_PUB);
@@ -245,6 +246,7 @@ int main(int argc, char** argv) {
 	g_main_loop_run(mainloop);
 
 	err_loadkeys: //
+	err_mtdinit: //
 	err_args: //
 	return ret;
 }

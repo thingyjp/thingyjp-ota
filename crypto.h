@@ -12,6 +12,14 @@ struct crypto_keys {
 	struct rsa_private_key privatekey;
 };
 
+struct crypto_checksigcntx {
+	const gchar* what;
+	guint8* data;
+	gsize len;
+	struct crypto_keys* keys;
+	gboolean cont;
+};
+
 struct manifest_signature* crypto_sign(enum manifest_signaturetype sigtype,
 		struct crypto_keys* keys, guint8* data, gsize len);
 gboolean crypto_verify(struct manifest_signature* signature,
@@ -22,3 +30,4 @@ void crypto_writekeys(struct crypto_keys* keys, const gchar* rsapubkeypath,
 struct crypto_keys* crypto_readkeys(const gchar* rsapubkeypath,
 		const gchar* rsaprivkeypath);
 void crypto_keys_free(struct crypto_keys* keys);
+void crypto_checksig(gpointer data, gpointer user_data);

@@ -166,7 +166,9 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 		teenyhttp_munchpayload(payload, payloadlen, datacallback,
 				datacallback_user_data);
 		while (response.contentleft > 0) {
+#ifdef TEENYHTTP_DEBUG
 			g_message("%u left", response.contentleft);
+#endif
 			gsize want = MIN(TEENYHTTP_READBUFFSZ, response.contentleft);
 			read = g_input_stream_read(
 					g_io_stream_get_input_stream(G_IO_STREAM(socketconnection)),
@@ -205,4 +207,14 @@ gboolean teenyhttp_get_simple(const gchar* host, const gchar* path,
 		teenyhttp_datacallback datacallback, gpointer datacallback_user_data) {
 	return teenyhttp_get(host, path, teenyhttp_defaultresponsecallback, NULL,
 			datacallback, datacallback_user_data);
+}
+
+gboolean teenyhttp_datacallback_bytebuffer(guint8* data, gsize len,
+		gpointer user_data) {
+	GByteArray* buffer = user_data;
+	g_byte_array_append(buffer, data, len);
+#ifdef TEENYHTTP_DEBUG
+	g_message("have %u bytes", buffer->len);
+#endif
+	return TRUE;
 }
