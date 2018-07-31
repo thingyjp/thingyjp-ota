@@ -221,13 +221,11 @@ int main(int argc, char** argv) {
 	}
 
 	if (!dryrun) {
-		int nummtds = g_strv_length(mtds);
-		if (mtds == NULL || nummtds < 2) {
+		int nummtds = mtds != NULL ? g_strv_length(mtds) : 0;
+		if (nummtds < 2) {
 			g_message("you must specify at least two mtd partitions");
 			goto err_args;
-		}
-
-		if (nummtds > 2) {
+		} else if (nummtds > 2) {
 			//TODO some message about not using more than two mtds here
 		}
 
