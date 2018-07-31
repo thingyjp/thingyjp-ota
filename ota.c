@@ -17,6 +17,7 @@ static gint64 manifestfetchedat;
 static struct manifest_image* targetimage = NULL;
 static gboolean waitingtoreboot = FALSE;
 static gboolean dryrun = FALSE;
+static gchar** mtds = NULL;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -137,6 +138,10 @@ static void ota_checkimages() {
 	g_ptr_array_free(candidates, TRUE);
 }
 
+static const gchar* ota_findpassive() {
+	return mtds[0];
+}
+
 static void ota_tryupdate() {
 	if (targetimage == NULL)
 		return;
@@ -163,12 +168,13 @@ static void ota_tryupdate() {
 	}
 
 	if (!dryrun) {
+		const gchar* mtd = ota_findpassive();
 		g_message("erasing passive partition...");
-		if (!mtd_erase("/dev/mtd0"))
+		if (!mtd_erase(mtd))
 			goto err_mtderase;
 
 		g_message("installing image...");
-		if (!mtd_writeimage("/dev/mtd0", imagebuffer->data, imagebuffer->len))
+		if (!mtd_writeimage(mtd, imagebuffer->data, imagebuffer->len))
 			goto err_mtdwrite;
 
 		g_message("scheduling reboot...");
@@ -195,7 +201,6 @@ int main(int argc, char** argv) {
 	host = "thingy.jp";
 	path = "/ota/spibeagle";
 	gchar* keysdir = NULL;
-	gchar** mtds = NULL;
 
 	GError* error = NULL;
 	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_KEYDIR, ARGS_MTD,
