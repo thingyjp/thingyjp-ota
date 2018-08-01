@@ -7,6 +7,7 @@
 #include "manifest.h"
 #include "utils.h"
 #include "mtd.h"
+#include "stamp.h"
 
 static gchar* host;
 static gchar* path;
@@ -234,6 +235,13 @@ int main(int argc, char** argv) {
 	if (keys == NULL) {
 		g_message("failed to load keys");
 		goto err_loadkeys;
+	}
+
+	gchar* stamppath = buildpath(arg_configdir, STAMPFILE, NULL);
+	struct stamp_stamp* stamp = stamp_loadstamp(stamppath);
+	if (stamp != NULL) {
+		currentversion = stamp->version;
+		stamp_freestamp(stamp);
 	}
 
 	teenyhttp_init();
