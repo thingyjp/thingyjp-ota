@@ -1,4 +1,6 @@
 #define GETTEXT_PACKAGE "gtk20"
+#include <unistd.h>
+#include <sys/reboot.h>
 #include "ota.h"
 #include "args.h"
 #include "teenyhttp.h"
@@ -179,8 +181,8 @@ static void ota_tryupdate() {
 			goto err_mtdwrite;
 
 		g_message("scheduling reboot...");
-
 		waitingtoreboot = TRUE;
+		reboot(RB_AUTOBOOT);
 	}
 
 	err_mtdwrite: //
