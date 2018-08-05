@@ -70,9 +70,27 @@ myimage_1.fit
 		"data": "xxx"
 	}
 ]
+```
 
 ## Hacking/Testing
 
 ```
 modprobe nandsim id_bytes=01,53,03,01,10 parts=1024,1024
+```
+
+## Example uboot script
+
+```
+loadaddr1=0x8a000000
+loadaddr2=0x8a700000
+fit1off=0x200000
+fit2off=0x900000
+imagesz=0x700000
+
+loadfit=sf read ${fitaddr} ${fitoff} ${imagesz}
+getfitts=if fdt addr ${fitaddr}; then fdt get value ${tsvar} / timestamp; else setenv ${tsvar} 0; fi
+loadfit1=setenv fitaddr ${loadaddr1}; setenv fitoff ${fit1off}; setenv tsvar fit1ts; run loadfit; run getfitts
+loadfit2=setenv fitaddr ${loadaddr2}; setenv fitoff ${fit2off}; setenv tsvar fit2ts; run loadfit; run getfitts
+chooseimage=if itest $fit2ts -gt $fit1ts; then setenv loadaddr ${loadaddr2}; setenv activepart 2; else setenv loadaddr ${loadaddr1}; setenv activepart 1; fi
+bootcmd=sf probe;run loadfit1; run loadfit2; run chooseimage; setenv bootargs ota.part=$activepart; bootm ${loadaddr}'
 ```

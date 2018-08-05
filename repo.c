@@ -92,6 +92,11 @@ static gboolean findbyversion(gconstpointer a, gconstpointer b) {
 	return ((struct manifest_image*) a)->version == GPOINTER_TO_UINT(b);
 }
 
+static gint sortbyversion(gconstpointer a, gconstpointer b) {
+	return ((struct manifest_image*) a)->version
+			- ((struct manifest_image*) b)->version;
+}
+
 static void repo_image_add(const gchar* imagepath, const gchar* stamp) {
 	struct manifest_manifest* manifest = manifest_load(manifestpath);
 
@@ -135,6 +140,7 @@ static void repo_image_add(const gchar* imagepath, const gchar* stamp) {
 	image->size = imagesz;
 	image->enabled = TRUE;
 	g_ptr_array_add(manifest->images, image);
+	g_ptr_array_sort(manifest->images, sortbyversion);
 
 	GError* imagewriteerr = NULL;
 	gchar* imageinrepo = buildpath(arg_repodir, image->uuid, NULL);
