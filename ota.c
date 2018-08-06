@@ -29,6 +29,39 @@ static gboolean responsecallback(const struct teenyhttp_response* response,
 			&& (strcmp(contenttype, response->contenttype) == 0);
 }
 
+static GHashTable* munchbootargs() {
+	GHashTable* table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
+			g_free);
+	// use the uboot supplied boot args as uboot fills this in
+	// even if the kernel ignores it
+	const gchar* fdtnode = "/sys/firmware/devicetree/base/chosen/bootargs";
+	gsize bootargssz;
+	gchar* bootargs;
+	if (!g_file_get_contents(fdtnode, &bootargs, &bootargssz, NULL)) {
+		g_message("failed to read bootargs from dt");
+		goto err_readbootargs;
+	}
+
+	GRegex* keyregexp = g_regex_new("(ota\.)([a-z]*)=([0-9,a-f,x]*)", 0, 0,
+	NULL);
+	g_assert(keyregexp != NULL);
+	GMatchInfo* match;
+	if (g_regex_match_full(keyregexp, bootargs, bootargssz, 0, 0, &match,
+	NULL)) {
+		while (g_match_info_matches(match)) {
+			gchar* key = g_match_info_fetch(match, 2);
+			gchar* value = g_match_info_fetch(match, 3);
+			g_message("ota.%s=%s", key, value);
+			g_hash_table_insert(table, key, value);
+			g_match_info_next(match, NULL);
+		}
+	}
+	g_match_info_free(match);
+	g_regex_unref(keyregexp);
+	err_readbootargs: //
+	return table;
+}
+
 static void updatemanifest() {
 	if (targetimage != NULL) {
 		g_message("target image selected, not updating manifest");
@@ -136,13 +169,49 @@ static void ota_checkimages() {
 		g_message("have %d candidates", candidates->len);
 		g_ptr_array_sort(candidates, ota_image_score);
 		targetimage = g_ptr_array_index(candidates, candidates->len - 1);
-		g_message("scheduled update to image %s", targetimage->uuid);
+		g_message("scheduled update to image %s(%u)", targetimage->uuid,
+				targetimage->version);
 	}
 	g_ptr_array_free(candidates, TRUE);
 }
 
 static const gchar* ota_findpassive() {
-	return mtds[0];
+	GHashTable* bootargs = munchbootargs();
+	gchar* mtd = mtds[0];
+	if (!g_hash_table_contains(bootargs, "part")) {
+		g_message(
+				"failed to find image offset in bootargs, first mtd will be used");
+		goto err_nopartkey;
+	}
+
+	gchar* partkey = g_hash_table_lookup(bootargs, "part");
+	guint64 offset = g_ascii_strtoull(partkey, NULL, 16);
+	gchar* activepart = mtd_foroffset(offset);
+	if (activepart == NULL) {
+		g_message(
+				"failed to find partition for offset %u, first mtd will be used",
+				(unsigned ) offset);
+		goto err_badoffset;
+	}
+	g_message("active partition is %s", activepart);
+
+	gchar* passive = NULL;
+	for (gchar** part = mtds; *part != NULL; part++) {
+		if (strcmp(*part, activepart) != 0) {
+			passive = *part;
+			break;
+		}
+	}
+	g_assert(passive != NULL);
+
+	g_message("selected %s as passive partition", passive);
+	mtd = passive;
+
+	err_nopassive: //
+	err_badoffset: //
+	err_nopartkey: //
+	g_hash_table_unref(bootargs);
+	return mtd;
 }
 
 static void ota_tryupdate() {

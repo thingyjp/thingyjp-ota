@@ -121,3 +121,44 @@ gboolean mtd_writeimage(const gchar* mtd, guint8* data, gsize len) {
 	err_imagesz: //
 	return ret;
 }
+
+gchar* mtd_foroffset(guint32 off) {
+	const gchar* mtdclasspath = "/sys/class/mtd";
+	GDir* mtdclassdir = g_dir_open(mtdclasspath, 0, NULL);
+	for (const gchar* subdir = g_dir_read_name(mtdclassdir); subdir != NULL;
+			subdir = g_dir_read_name(mtdclassdir)) {
+		const gchar* offsetpath = g_build_path("/", mtdclasspath, subdir,
+				"offset", NULL);
+		const gchar* sizepath = g_build_path("/", mtdclasspath, subdir, "size",
+		NULL);
+
+		guint64 offset = 0;
+		guint64 size = 0;
+		gsize offsetdatasz;
+		gchar* offsetdata;
+		if (!g_file_get_contents(offsetpath, &offsetdata, &offsetdatasz, NULL))
+			goto err_readoff;
+
+		gsize sizedatasz;
+		gchar* sizedata;
+		if (!g_file_get_contents(sizepath, &sizedata, &sizedatasz, NULL))
+			goto err_readsz;
+
+		offset = g_ascii_strtoull(offsetdata, NULL, 10);
+		size = g_ascii_strtoull(sizedata, NULL, 10);
+
+		g_free(sizedata);
+		err_readsz: //
+		g_free(offsetdata);
+		err_readoff: //
+
+		if (size == 0)
+			continue;
+
+		if (off >= offset && off < offset + size) {
+			gchar* mtd = g_build_path("/", "/dev", subdir, NULL);
+			return mtd;
+		}
+	}
+	return NULL;
+}

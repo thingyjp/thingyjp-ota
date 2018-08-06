@@ -28,6 +28,16 @@ be replaced.
 * Enough RAM to hold the two images during boot up.
 * A GPIO to trigger booting the previous firmware in recovery situations.
 
+## Device config
+
+Usually in /etc/thingjp/ota
+
+```
+keys
+|-- rsa.pub
+stamp.json
+```
+
 ## Firmware repo
 
 ### Layout
@@ -91,6 +101,6 @@ loadfit=sf read ${fitaddr} ${fitoff} ${imagesz}
 getfitts=if fdt addr ${fitaddr}; then fdt get value ${tsvar} / timestamp; else setenv ${tsvar} 0; fi
 loadfit1=setenv fitaddr ${loadaddr1}; setenv fitoff ${fit1off}; setenv tsvar fit1ts; run loadfit; run getfitts
 loadfit2=setenv fitaddr ${loadaddr2}; setenv fitoff ${fit2off}; setenv tsvar fit2ts; run loadfit; run getfitts
-chooseimage=if itest $fit2ts -gt $fit1ts; then setenv loadaddr ${loadaddr2}; setenv activepart 2; else setenv loadaddr ${loadaddr1}; setenv activepart 1; fi
+chooseimage=if itest $fit2ts -gt $fit1ts; then setenv loadaddr ${loadaddr2}; setenv activepart ${fit2off}; else setenv loadaddr ${loadaddr1}; setenv activepart ${fit1off}; fi
 bootcmd=sf probe;run loadfit1; run loadfit2; run chooseimage; setenv bootargs ota.part=$activepart; bootm ${loadaddr}'
 ```
