@@ -20,6 +20,7 @@ static gint64 manifestfetchedat;
 static struct manifest_image* targetimage = NULL;
 static gboolean waitingtoreboot = FALSE;
 static gboolean dryrun = FALSE;
+static gboolean force = FALSE;
 static gchar** mtds = NULL;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
@@ -138,7 +139,7 @@ static void ota_image_findcandidate(gpointer data, gpointer user_data) {
 	if (!image->enabled) {
 		g_message("image isn't enabled");
 		return;
-	} else if (image->version <= currentversion) {
+	} else if (!force && image->version <= currentversion) {
 		g_message("image version %d isn't higher than %d", image->version,
 				currentversion);
 		return;
@@ -276,7 +277,7 @@ int main(int argc, char** argv) {
 
 	GError* error = NULL;
 	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_CONFIGDIR, ARGS_MTD,
-	ARGS_DRYRUN, { NULL } };
+	ARGS_DRYRUN, ARGS_FORCE, { NULL } };
 	GOptionContext* optioncontext = g_option_context_new(NULL);
 	g_option_context_add_main_entries(optioncontext, entries,
 	GETTEXT_PACKAGE);

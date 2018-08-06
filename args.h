@@ -5,6 +5,7 @@
 #define ARGS_PATH    {"path", 'p', 0, G_OPTION_ARG_STRING, &path,"path", NULL}
 #define ARGS_MTD     {"mtd", 'm', 0, G_OPTION_ARG_STRING_ARRAY, &mtds,"mtd", NULL}
 #define ARGS_DRYRUN  {"dryrun", 0, 0, G_OPTION_ARG_NONE, &dryrun,"Don't actually apply updates", NULL}
+#define ARGS_FORCE   {"force", 0, 0, G_OPTION_ARG_NONE, &force,"Update even if the latest version is the same", NULL}
 
 // for stamp only
 #define ARGS_ROOTDIR                 {"rootdir", 't', 0, G_OPTION_ARG_FILENAME, &arg_rootdir,"image root directory", NULL}
