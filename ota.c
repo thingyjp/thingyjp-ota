@@ -148,8 +148,8 @@ static void ota_image_findcandidate(gpointer data, gpointer user_data) {
 }
 
 static gint ota_image_score(gconstpointer a, gconstpointer b) {
-	const struct manifest_image* left = a;
-	const struct manifest_image* right = b;
+	const struct manifest_image* left = *((struct manifest_image**) a);
+	const struct manifest_image* right = *((struct manfiest_image**) b);
 	return left->version - right->version;
 }
 
