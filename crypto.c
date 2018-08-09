@@ -1,6 +1,10 @@
 #include <nettle/yarrow.h>
 #include <nettle/buffer.h>
+
+#if 0
 #include <thingymcconfig/utils.h>
+#endif
+
 #include "crypto.h"
 #include "utils.h"
 
@@ -139,10 +143,12 @@ void crypto_writekeys(struct crypto_keys* keys, const gchar* rsapubkeypath,
 	rsa_keypair_to_sexp(&pub_buffer, NULL, &keys->pubkey, NULL);
 	rsa_keypair_to_sexp(&priv_buffer, NULL, &keys->pubkey, &keys->privatekey);
 
+#if 0
 	g_message("pubkey:");
 	thingymcconfig_utils_hexdump(pub_buffer.contents, pub_buffer.size);
 	g_message("privkey:");
 	thingymcconfig_utils_hexdump(priv_buffer.contents, priv_buffer.size);
+#endif
 
 	g_file_set_contents(rsapubkeypath, (gchar*) pub_buffer.contents,
 			pub_buffer.size,
