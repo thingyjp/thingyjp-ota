@@ -82,7 +82,7 @@ static void teenyhttp_munchheaders(const gchar* headers,
 static void teenyhttp_munchpayload(guint8* payload, gsize len,
 		teenyhttp_datacallback callback, gpointer user_data) {
 #ifdef TEENYHTTP_DEBUG
-	teenyhttp_hexdump(payload, len);
+	thingymcconfig_utils_hexdump(payload, len);
 #endif
 	if (callback != NULL)
 		callback(payload, len, user_data);

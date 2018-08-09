@@ -9,7 +9,8 @@ incs = include_directories(['json-glib-macros'])
   
 cc = meson.get_compiler('c')
 
-deps = [dependency('glib-2.0'),
+deps = [dependency('libthingymcconfig_client_glib'),
+        dependency('glib-2.0'),
         dependency('gio-unix-2.0'),
         dependency('json-glib-1.0'),
         dependency('nettle'),
