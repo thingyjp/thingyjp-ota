@@ -93,8 +93,8 @@ static gboolean findbyversion(gconstpointer a, gconstpointer b) {
 }
 
 static gint sortbyversion(gconstpointer a, gconstpointer b) {
-	return ((struct manifest_image*) a)->version
-			- ((struct manifest_image*) b)->version;
+	return (*(struct manifest_image**) a)->version
+			- (*(struct manifest_image**) b)->version;
 }
 
 static void repo_image_add(const gchar* imagepath, const gchar* stamp) {
