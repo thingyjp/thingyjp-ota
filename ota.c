@@ -1,6 +1,7 @@
 #define GETTEXT_PACKAGE "gtk20"
 #include <unistd.h>
 #include <sys/reboot.h>
+#include <thingymcconfig/client_glib.h>
 #include "ota.h"
 #include "args.h"
 #include "teenyhttp.h"
@@ -22,6 +23,7 @@ static gboolean waitingtoreboot = FALSE;
 static gboolean dryrun = FALSE;
 static gboolean force = FALSE;
 static gchar** mtds = NULL;
+static guint timeoutsource;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -269,6 +271,15 @@ static gboolean timeout(gpointer user_data) {
 	return waitingtoreboot ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
 }
 
+void ota_supplicant_connected(void) {
+	timeout(NULL);
+	timeoutsource = g_timeout_add_seconds(60 * 10, timeout, NULL);
+}
+
+void ota_supplicant_disconnected(void) {
+	g_source_remove(timeoutsource);
+}
+
 int main(int argc, char** argv) {
 	int ret = 0;
 	host = "thingy.jp";
@@ -311,18 +322,27 @@ int main(int argc, char** argv) {
 
 	gchar* stamppath = buildpath(arg_configdir, STAMPFILE, NULL);
 	struct stamp_stamp* stamp = stamp_loadstamp(stamppath);
-	if (stamp != NULL) {
-		currentversion = stamp->version;
-		stamp_freestamp(stamp);
-	}
+	if (stamp == NULL)
+		goto err_loadstamp;
+	currentversion = stamp->version;
+	stamp_freestamp(stamp);
 
 	teenyhttp_init();
-	timeout(NULL);
+
+	ThingyMcConfigClient* client = thingymcconfig_client_new("ota");
+	g_signal_connect(client,
+			THINGYMCCONFIG_CLIENT_SIGNAL_NETWORKSTATE "::" THINGYMCCONFIG_CLIENT_DETAIL_NETWORKSTATE_SUPPLICANTCONNECTED,
+			ota_supplicant_connected, NULL);
+	g_signal_connect(client,
+			THINGYMCCONFIG_CLIENT_SIGNAL_NETWORKSTATE "::" THINGYMCCONFIG_CLIENT_DETAIL_NETWORKSTATE_SUPPLICANTDISCONNECTED,
+			ota_supplicant_disconnected, NULL);
+	thingymcconfig_client_lazyconnect(client);
 
 	GMainLoop* mainloop = g_main_loop_new(NULL, FALSE);
-	g_timeout_add_seconds(60 * 10, timeout, NULL);
+
 	g_main_loop_run(mainloop);
 
+	err_loadstamp: //
 	err_loadkeys: //
 	err_mtdinit: //
 	err_args: //

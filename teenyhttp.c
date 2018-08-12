@@ -128,7 +128,7 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 			readbuff,
 			TEENYHTTP_READBUFFSZ, NULL, NULL);
 
-	gchar* preambleend = g_strstr_len(readbuff, read,
+	gchar* preambleend = g_strstr_len((gchar*) readbuff, read,
 	TEENYHTTP_HTTP_LINETERM""TEENYHTTP_HTTP_LINETERM);
 	if (preambleend == NULL)
 		g_message("didn't find end of preamble block");
@@ -138,7 +138,7 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 	gchar* resultline = readbuff;
 	size_t preamblelen = preambleend - resultline;
 
-	gchar* resultlineend = g_strstr_len(readbuff, preamblelen,
+	gchar* resultlineend = g_strstr_len((gchar*) readbuff, preamblelen,
 	TEENYHTTP_HTTP_LINETERM);
 	if (resultlineend == NULL) {
 		g_message("didn't find end of result line");
@@ -175,7 +175,7 @@ gboolean teenyhttp_get(const gchar* host, const gchar* path,
 					readbuff, want, NULL, NULL);
 
 			if (read < 0) {
-				g_message("failed to read %d", read);
+				g_message("failed to read %"G_GSSIZE_FORMAT, read);
 				goto err_read;
 			}
 			if (read > 0) {
