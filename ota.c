@@ -23,7 +23,7 @@ static gboolean waitingtoreboot = FALSE;
 static gboolean dryrun = FALSE;
 static gboolean force = FALSE;
 static gchar** mtds = NULL;
-static guint timeoutsource;
+static guint timeoutsource = 0;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -277,7 +277,10 @@ void ota_supplicant_connected(void) {
 }
 
 void ota_supplicant_disconnected(void) {
-	g_source_remove(timeoutsource);
+	if (timeoutsource != 0) {
+		g_source_remove(timeoutsource);
+		timeoutsource = 0;
+	}
 }
 
 int main(int argc, char** argv) {
