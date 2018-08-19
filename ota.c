@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/reboot.h>
 #include <thingymcconfig/client_glib.h>
+#include <thingymcconfig/logging.h>
 #include "ota.h"
 #include "args.h"
 #include "teenyhttp.h"
@@ -288,10 +289,11 @@ int main(int argc, char** argv) {
 	host = "thingy.jp";
 	path = "/ota/spibeagle";
 	gchar* arg_configdir = OTA_CONFIGDIR_DEFAULT;
+	gchar* logfile = NULL;
 
 	GError* error = NULL;
 	GOptionEntry entries[] = { ARGS_HOST, ARGS_PATH, ARGS_CONFIGDIR, ARGS_MTD,
-	ARGS_DRYRUN, ARGS_FORCE, { NULL } };
+	ARGS_DRYRUN, ARGS_FORCE, ARGS_LOG, { NULL } };
 	GOptionContext* optioncontext = g_option_context_new(NULL);
 	g_option_context_add_main_entries(optioncontext, entries,
 	GETTEXT_PACKAGE);
@@ -300,6 +302,8 @@ int main(int argc, char** argv) {
 		ret = 1;
 		goto err_args;
 	}
+
+	logging_init(logfile);
 
 	if (!dryrun) {
 		int nummtds = mtds != NULL ? g_strv_length(mtds) : 0;
