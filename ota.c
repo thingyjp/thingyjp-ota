@@ -26,6 +26,7 @@ static gboolean force = FALSE;
 static gchar** mtds = NULL;
 static guint timeoutsource = 0;
 static ThingyMcConfigClient* client;
+static gboolean connectivitystate = FALSE;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -65,6 +66,13 @@ static GHashTable* munchbootargs() {
 	g_regex_unref(keyregexp);
 	err_readbootargs: //
 	return table;
+}
+
+static void onendtoendconnectionsuccess() {
+	if (!connectivitystate) {
+		connectivitystate = TRUE;
+		thingymcconfig_client_sendconnectivitystate(client, connectivitystate);
+	}
 }
 
 static void updatemanifest() {
@@ -123,6 +131,7 @@ static void updatemanifest() {
 	}
 	manifest = newmanifest;
 	manifestfetchedat = g_get_real_time();
+	onendtoendconnectionsuccess();
 
 	out: //
 	err_manifestparse: //
