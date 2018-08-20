@@ -25,6 +25,7 @@ static gboolean dryrun = FALSE;
 static gboolean force = FALSE;
 static gchar** mtds = NULL;
 static guint timeoutsource = 0;
+static ThingyMcConfigClient* client;
 
 static gboolean responsecallback(const struct teenyhttp_response* response,
 		gpointer user_data) {
@@ -152,7 +153,7 @@ static void ota_image_findcandidate(gpointer data, gpointer user_data) {
 
 static gint ota_image_score(gconstpointer a, gconstpointer b) {
 	const struct manifest_image* left = *((struct manifest_image**) a);
-	const struct manifest_image* right = *((struct manfiest_image**) b);
+	const struct manifest_image* right = *((struct manifest_image**) b);
 	return left->version - right->version;
 }
 
@@ -272,16 +273,24 @@ static gboolean timeout(gpointer user_data) {
 	return waitingtoreboot ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
 }
 
-void ota_supplicant_connected(void) {
+static void ota_daemon_connected(void) {
+	thingymcconfig_client_sendappstate(client);
+}
+
+static void ota_supplicant_connected(void) {
 	timeout(NULL);
 	timeoutsource = g_timeout_add_seconds(60 * 10, timeout, NULL);
 }
 
-void ota_supplicant_disconnected(void) {
+static void ota_supplicant_disconnected(void) {
 	if (timeoutsource != 0) {
 		g_source_remove(timeoutsource);
 		timeoutsource = 0;
 	}
+}
+
+static void ota_daemon_disconnected(void) {
+
 }
 
 int main(int argc, char** argv) {
@@ -336,18 +345,23 @@ int main(int argc, char** argv) {
 
 	teenyhttp_init();
 
-	ThingyMcConfigClient* client = thingymcconfig_client_new("ota");
-	g_signal_connect(client,
-			THINGYMCCONFIG_CLIENT_SIGNAL_NETWORKSTATE "::" THINGYMCCONFIG_CLIENT_DETAIL_NETWORKSTATE_SUPPLICANTCONNECTED,
+	client = thingymcconfig_client_new("ota");
+	g_signal_connect(client, THINGYMCCONFIG_DETAILEDSIGNAL_DAEMON_CONNECTED,
+			ota_daemon_connected, NULL);
+	g_signal_connect(client, THINGYMCCONFIG_DETAILEDSIGNAL_SUPPLICANT_CONNECTED,
 			ota_supplicant_connected, NULL);
 	g_signal_connect(client,
-			THINGYMCCONFIG_CLIENT_SIGNAL_NETWORKSTATE "::" THINGYMCCONFIG_CLIENT_DETAIL_NETWORKSTATE_SUPPLICANTDISCONNECTED,
+			THINGYMCCONFIG_DETAILEDSIGNAL_SUPPLICANT_DISCONNECTED,
 			ota_supplicant_disconnected, NULL);
+	g_signal_connect(client, THINGYMCCONFIG_DETAILEDSIGNAL_DAEMON_DISCONNECTED,
+			ota_daemon_disconnected, NULL);
 	thingymcconfig_client_lazyconnect(client);
 
 	GMainLoop* mainloop = g_main_loop_new(NULL, FALSE);
 
 	g_main_loop_run(mainloop);
+
+	thingymcconfig_client_free(client);
 
 	err_loadstamp: //
 	err_loadkeys: //
