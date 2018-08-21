@@ -3,9 +3,9 @@
 #include <sys/reboot.h>
 #include <thingymcconfig/client_glib.h>
 #include <thingymcconfig/logging.h>
+#include <teenynet/http.h>
 #include "ota.h"
 #include "args.h"
-#include "teenyhttp.h"
 #include "jsonparserutils.h"
 #include "crypto.h"
 #include "manifest.h"

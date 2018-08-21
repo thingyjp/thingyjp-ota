@@ -1,6 +1,6 @@
 project('ota', 'c')
 
-ota_src = ['ota.c', 'teenyhttp.c', 'crypto.c', 'utils.c', 'manifest.c', 'mtd.c']
+ota_src = ['ota.c', 'crypto.c', 'utils.c', 'manifest.c', 'mtd.c']
 stamp_src = ['stamp.c', 'manifest.c', 'utils.c']
 repo_src = ['repo.c', 'crypto.c', 'utils.c', 'manifest.c']
 keygen_src = ['keygen.c', 'crypto.c', 'utils.c']
@@ -24,11 +24,12 @@ if get_option('host')
  executable('ota_keygen', keygen_src, include_directories : incs, dependencies : host_deps, install : true)
 else
  target_deps = [dependency('libthingymcconfig_client_glib'),
-        dependency('glib-2.0'),
-        dependency('gio-unix-2.0'),
-        dependency('json-glib-1.0'),
-        dependency('nettle'),
-        dependency('hogweed'),
-        cc.find_library('gmp')]
+                dependency('libteenynet'),
+                dependency('glib-2.0'),
+                dependency('gio-unix-2.0'),
+                dependency('json-glib-1.0'),
+                dependency('nettle'),
+                dependency('hogweed'),
+                cc.find_library('gmp')]
  executable('ota', ota_src, include_directories : incs, dependencies : target_deps, install : true, install_dir : 'sbin')
 endif
