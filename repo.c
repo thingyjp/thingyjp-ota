@@ -135,7 +135,7 @@ static void repo_image_add(const gchar* imagepath, const gchar* stamp) {
 		}
 	}
 
-	image->uuid = s->uuid;
+	image->uuid = g_strdup(s->uuid);
 	image->version = s->version;
 	image->size = imagesz;
 	image->enabled = TRUE;
