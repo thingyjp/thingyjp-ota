@@ -298,6 +298,8 @@ static void repo_repair() {
 	crypto_keys_free(keys);
 }
 
+static const gint REPODIRMODE = 0755;
+
 int main(int argc, char** argv) {
 
 	int ret = 0;
@@ -353,7 +355,7 @@ int main(int argc, char** argv) {
 		goto err_args;
 	}
 
-	if (g_mkdir_with_parents(arg_repodir, 0700) > 0) {
+	if (g_mkdir_with_parents(arg_repodir, REPODIRMODE) > 0) {
 		g_message("failed to create repo dir");
 		goto err_createdir;
 	}
