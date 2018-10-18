@@ -26,7 +26,7 @@ struct manifest_image* manifest_image_new() {
 
 static void manifest_image_free(struct manifest_image* manifest_image) {
 	if (manifest_image->uuid != NULL)
-		g_free(manifest_image->uuid);
+		g_free((gchar*) manifest_image->uuid);
 	g_ptr_array_free(manifest_image->signatures, TRUE);
 	g_free(manifest_image);
 }
@@ -117,7 +117,7 @@ static void manifest_image_deserialise(JsonArray *array, guint index,
 	GPtrArray* manifest_images = user_data;
 	struct manifest_image* image = manifest_image_new();
 
-	gchar* uuid;
+	const gchar* uuid;
 	int version;
 	gssize size;
 	JsonObject* imageobj = JSON_NODE_GET_OBJECT(element_node);
@@ -166,6 +166,7 @@ gboolean manifest_deserialise_into(struct manifest_manifest* manifest,
 	JsonParser* parser = json_parser_new();
 
 	int serial;
+	const gchar* uuid;
 	if (json_parser_load_from_data(parser, data, len, NULL)) {
 		JsonNode* root = json_parser_get_root(parser);
 		JsonObject* rootobj = JSON_NODE_GET_OBJECT(root);
@@ -174,6 +175,13 @@ gboolean manifest_deserialise_into(struct manifest_manifest* manifest,
 					MANIFEST_JSONFIELD_SERIAL);
 			if (serial <= 0) {
 				g_message("bad serial");
+				goto err_parse;
+			}
+
+			uuid = JSON_OBJECT_GET_MEMBER_STRING(rootobj,
+					MANIFEST_JSONFIELD_UUID);
+			if (uuid == NULL) {
+				g_message("bad repo uuid");
 				goto err_parse;
 			}
 
@@ -196,6 +204,7 @@ gboolean manifest_deserialise_into(struct manifest_manifest* manifest,
 	}
 
 	manifest->serial = serial;
+	manifest->uuid = g_strdup(uuid);
 
 	ret = TRUE;
 
@@ -209,6 +218,10 @@ JsonBuilder* manifest_serialise(struct manifest_manifest* manifest) {
 	json_builder_begin_object(builder);
 
 	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_SERIAL, manifest->serial);
+
+	g_assert(manifest->uuid != NULL);
+	JSONBUILDER_ADD_STRING(builder, MANIFEST_JSONFIELD_UUID, manifest->uuid);
+
 	JSONBUILDER_ADD_INT(builder, MANIFEST_JSONFIELD_TIMESTAMP,
 			manifest->timestamp);
 	JSONBUILDER_START_ARRAY(builder, MANIFEST_JSONFIELD_IMAGES);
@@ -231,12 +244,14 @@ struct manifest_manifest* manifest_deserialise(const gchar* data, gsize len) {
 
 struct manifest_manifest* manifest_new() {
 	struct manifest_manifest* manifest = g_malloc0(sizeof(*manifest));
+	manifest->uuid = g_uuid_string_random();
 	manifest->images = g_ptr_array_new_with_free_func(
 			manifest_image_free_gdestroynotify);
 	return manifest;
 }
 
 void manifest_free(struct manifest_manifest* manifest) {
+	g_free((gchar*) manifest->uuid);
 	g_ptr_array_free(manifest->images, TRUE);
 	g_free(manifest);
 }

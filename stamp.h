@@ -2,12 +2,14 @@
 
 #include "jsonparserutils.h"
 
-#define STAMPFILE               "stamp.json"
-#define STAMP_JSONFIELD_UUID    "uuid"
-#define STAMP_JSONFIELD_VERSION "version"
+#define STAMPFILE				 "stamp.json"
+#define STAMP_JSONFIELD_UUID	 "uuid"
+#define STAMP_JSONFIELD_REPOUUID "repouuid"
+#define STAMP_JSONFIELD_VERSION  "version"
 
 struct stamp_stamp {
 	gchar* uuid;
+	gchar* repouuid;
 	guint version;
 };
 
@@ -28,11 +30,18 @@ static struct stamp_stamp* stamp_loadstamp(const gchar* stamp) {
 
 	const gchar* uuid = JSON_OBJECT_GET_MEMBER_STRING(stamproot,
 			STAMP_JSONFIELD_UUID);
+	const gchar* repouuid = JSON_OBJECT_GET_MEMBER_STRING(stamproot,
+			STAMP_JSONFIELD_REPOUUID);
 	int version = JSON_OBJECT_GET_MEMBER_INT(stamproot,
 			STAMP_JSONFIELD_VERSION);
 
 	if (uuid == NULL) {
 		g_message("failed to get uuid from stamp");
+		goto err_parse;
+	}
+
+	if (repouuid == NULL) {
+		g_message("failed to get repouuid from stamp");
 		goto err_parse;
 	}
 
@@ -43,6 +52,7 @@ static struct stamp_stamp* stamp_loadstamp(const gchar* stamp) {
 
 	s = g_malloc0(sizeof(*s));
 	s->uuid = g_strdup(uuid);
+	s->repouuid = g_strdup(repouuid);
 	s->version = version;
 	err_load: //
 	err_parse: //
@@ -53,5 +63,6 @@ static struct stamp_stamp* stamp_loadstamp(const gchar* stamp) {
 static void stamp_freestamp(struct stamp_stamp*) __attribute__((unused));
 static void stamp_freestamp(struct stamp_stamp* stamp) {
 	g_free(stamp->uuid);
+	g_free(stamp->repouuid);
 	g_free(stamp);
 }

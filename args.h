@@ -11,6 +11,7 @@
 // for stamp only
 #define ARGS_ROOTDIR                 {"rootdir", 't', 0, G_OPTION_ARG_FILENAME, &arg_rootdir,"image root directory", NULL}
 #define ARGS_PARAMETER_IMAGEVERSION  {"version", 'v', 0, G_OPTION_ARG_INT, &param_imageversion, "version of image", NULL}
+#define ARGS_REPOUUID				 {"repouuid", 'u', 0, G_OPTION_ARG_STRING, &arg_repouuid, "uuid of the repo", NULL}
 
 // for stamp and ota
 #define ARGS_CONFIGDIR {"configdir", 'c', 0, G_OPTION_ARG_FILENAME, &arg_configdir,"ota config directory", NULL}

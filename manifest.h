@@ -22,6 +22,7 @@ struct manifest_signature {
 
 struct manifest_manifest {
 	unsigned serial;
+	const gchar* uuid;
 	gint64 timestamp;
 	GPtrArray* images;
 };
@@ -31,6 +32,7 @@ struct manifest_manifest {
 #define MANIFEST_CONTENTTYPE "application/json"
 
 #define MANIFEST_JSONFIELD_SERIAL         "serial"
+#define MANIFEST_JSONFIELD_UUID			  "uuid"
 #define MANIFEST_JSONFIELD_TIMESTAMP      "timestamp"
 #define MANIFEST_JSONFIELD_IMAGES         "images"
 #define MANIFEST_JSONFIELD_IMAGE_UUID     "uuid"
