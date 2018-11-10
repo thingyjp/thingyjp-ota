@@ -1,0 +1,5 @@
+[wrap-git]
+directory = thingymcconfig
+url = https://github.com/thingyjp/thingymcconfig.git
+revision = head
+clone-recursive = true

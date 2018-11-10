@@ -23,8 +23,21 @@ if get_option('host')
  executable('ota_repo', repo_src, include_directories : incs, dependencies : host_deps, install : true)
  executable('ota_keygen', keygen_src, include_directories : incs, dependencies : host_deps, install : true)
 else
- target_deps = [dependency('libthingymcconfig_client_glib'),
-                dependency('libteenynet'),
+
+ thingymcconfig_dep = dependency('libthingymcconfig_client_glib', required : false)
+ if not thingymcconfig_dep.found()
+  thingymcconfig = subproject('thingymcconfig')
+  thingymcconfig_dep = thingymcconfig.get_variable('thingymcconfig_dep')
+ endif  
+
+ teenynet_dep = dependency('libteenynet', required : false)
+ if not teenynet_dep.found()
+  teenynet = subproject('teenynet')
+  teenynet_dep = teenynet.get_variable('teenynet_dep')
+ endif  
+
+ target_deps = [thingymcconfig_dep,
+                teenynet_dep,
                 dependency('glib-2.0'),
                 dependency('gio-unix-2.0'),
                 dependency('json-glib-1.0'),
