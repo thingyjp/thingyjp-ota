@@ -1,5 +1,7 @@
 # OTA for Linux things
 
+[![Build Status](https://travis-ci.com/thingyjp/thingyjp-ota.svg?branch=master)](https://travis-ci.com/thingyjp/thingyjp-ota)
+
 ## Brief
 
 Implementation of a small full image active/inactive OTA system for automatically
